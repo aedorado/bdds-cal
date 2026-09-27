@@ -90,8 +90,10 @@ export async function POST(request: NextRequest) {
   );
 
   let sent = 0;
-  let skipped = 0;
-  const failures: string[] = [];
+  let skipped = 0;   // genuinely already delivered to this device
+  let retired = 0;   // subscription the push service says is dead
+  const failures: string[] = [];  // delivery problems - expected, operational
+  const errors: string[] = [];    // unexpected faults - something is actually wrong
 
   for (const reminder of due) {
     const type = reminder.occurrence.event.event_type;
@@ -118,7 +120,17 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (claimError) {
-        skipped++;
+        // 23505 is a unique violation: this device already has this reminder,
+        // which is the guard working. Anything else is a real fault, and
+        // lumping the two together is what hid a broken deploy - every claim
+        // was being rejected by a NOT NULL column and silently counted as
+        // "already sent", so the endpoint reported success while delivering
+        // nothing.
+        if (claimError.code === "23505") {
+          skipped++;
+        } else {
+          errors.push(`claim ${claimError.code ?? "?"}: ${claimError.message}`);
+        }
         continue;
       }
 
@@ -145,6 +157,7 @@ export async function POST(request: NextRequest) {
             .from("push_subscriptions")
             .update({ expired_at: new Date().toISOString() })
             .eq("id", sub.id);
+          retired++;
           failures.push(`expired:${sub.id}`);
         } else {
           failures.push(`${status ?? "err"}:${sub.id}`);
@@ -153,11 +166,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({
+  const body = {
     checked: events.length,
     due: due.length,
     sent,
     skipped,
+    retired,
     failures: failures.slice(0, 20),
-  });
+    errors: errors.slice(0, 20),
+  };
+
+  // Nothing watches this endpoint, so an unexpected fault has to announce
+  // itself. A non-2xx shows up in net._http_response and cron.job_run_details,
+  // which is the only place anyone would notice. Delivery failures are normal
+  // operations and deliberately do NOT trigger this - a dead subscription is
+  // not a broken system.
+  return NextResponse.json(body, { status: errors.length > 0 ? 500 : 200 });
 }
