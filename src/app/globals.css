@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   FullCalendar comes with its own stylesheet, which assumes a bigger, bluer,
+   more default-looking page than this one. These overrides pull it back into
+   the stone palette and, more importantly, stop its three-part toolbar from
+   running off the side of a phone.
+   --------------------------------------------------------------------------- */
+
+.calendar-wrap .fc {
+  --fc-border-color: #e7e5e4;
+  --fc-today-bg-color: #fef9c3;
+  --fc-page-bg-color: #ffffff;
+  font-size: 0.875rem;
+}
+
+.calendar-wrap .fc .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.calendar-wrap .fc .fc-button {
+  background: #fff;
+  border-color: #d6d3d1;
+  color: #44403c;
+  box-shadow: none;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  text-transform: none;
+}
+.calendar-wrap .fc .fc-button:hover { background: #f5f5f4; }
+.calendar-wrap .fc .fc-button:focus { box-shadow: 0 0 0 2px #d6d3d1; }
+.calendar-wrap .fc .fc-button-primary:disabled { background: #fff; color: #a8a29e; border-color: #e7e5e4; }
+.calendar-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
+.calendar-wrap .fc .fc-button-primary:not(:disabled):active {
+  background: #1c1917;
+  border-color: #1c1917;
+  color: #fff;
+}
+
+.calendar-wrap .fc .fc-daygrid-day-number,
+.calendar-wrap .fc .fc-col-header-cell-cushion,
+.calendar-wrap .fc .fc-list-day-text,
+.calendar-wrap .fc .fc-list-day-side-text {
+  color: #44403c;
+  text-decoration: none;
+}
+
+.calendar-wrap .fc .fc-event { cursor: pointer; padding: 1px 3px; }
+.calendar-wrap .fc .evt-cancelled { text-decoration: line-through; opacity: 0.75; }
+.calendar-wrap .fc .evt-tentative { opacity: 0.75; border-style: dashed; }
+
+/* Background festival markers carry their name in a title attribute only, so
+   keep them quiet behind real events. */
+.calendar-wrap .fc .fc-bg-event { opacity: 0.55; }
+
+@media (max-width: 640px) {
+  .calendar-wrap .fc .fc-header-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .calendar-wrap .fc .fc-toolbar-chunk { display: flex; justify-content: center; }
+  .calendar-wrap .fc .fc-toolbar-title { text-align: center; }
+  .calendar-wrap .fc .fc-button { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+}
+
+/* Observances sit quietly behind the actual schedule: a coloured dot and a
+   label, never a filled block competing with a real event. */
+.calendar-wrap .fc .evt-festival .fc-list-item-title,
+.calendar-wrap .fc .evt-festival .fc-event-title {
+  font-style: italic;
+  color: #57534e;
+}
+.calendar-wrap .fc .fc-daygrid-dot-event { padding: 1px 2px; }
+.calendar-wrap .fc .fc-daygrid-dot-event:hover { background: #f5f5f4; }
+
+/* Clip long observance names with an ellipsis rather than cutting mid-letter.
+   The full text is on the element's title attribute and in the "+N more"
+   popover, so nothing is actually lost. */
+.calendar-wrap .fc .fc-daygrid-dot-event,
+.calendar-wrap .fc .fc-daygrid-block-event {
+  overflow: hidden;
+}
+.calendar-wrap .fc .fc-daygrid-event .fc-event-title,
+.calendar-wrap .fc .fc-daygrid-event .fc-event-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-wrap .fc .fc-daygrid-more-link {
+  font-size: 0.75rem;
+  color: #78716c;
+  padding: 0 2px;
+}
+.calendar-wrap .fc .fc-daygrid-more-link:hover { color: #1c1917; text-decoration: underline; }
+
+/* The popover is where the full names live, so let it breathe - and scroll
+   rather than run off the screen on a very busy day. */
+.calendar-wrap .fc .fc-popover {
+  border: 1px solid #e7e5e4;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.12);
+  max-width: min(26rem, 92vw);
+}
+.calendar-wrap .fc .fc-popover-header {
+  background: #f5f5f4;
+  border-radius: 0.75rem 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-weight: 600;
+  color: #1c1917;
+}
+.calendar-wrap .fc .fc-popover-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.5rem 0.25rem;
+}
+/* Inside the popover there is room, so let names wrap in full. */
+.calendar-wrap .fc .fc-popover-body .fc-daygrid-event { overflow: visible; }
+.calendar-wrap .fc .fc-popover-body .fc-event-title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Agenda (list) view is the phone default, so it has to read well. */
+.calendar-wrap .fc .fc-list { border-color: #e7e5e4; }
+.calendar-wrap .fc .fc-list-day-cushion { background: #f5f5f4; }
+.calendar-wrap .fc .fc-list-event:hover td { background: #fafaf9; }
+.calendar-wrap .fc .fc-list-event-title { white-space: normal; }
+.calendar-wrap .fc .fc-list-event-dot { border-color: currentColor; }
