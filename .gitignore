@@ -41,3 +41,14 @@ yarn-error.log*
 next-env.d.ts
 !.env.local.example
 supabase/real-flights.sql
+
+# Real itinerary data: contains airline booking references (PNRs), which are
+# enough to view and often modify someone's booking. Never commit this.
+supabase/real-flights.sql
+
+# Export archives bundle the whole working tree, including files ignored
+# individually above - a zip silently defeats every rule in this file.
+*.zip
+
+# Filled-in copy of the cron migration: contains the real CRON_SECRET.
+supabase/0004_cron.local.sql

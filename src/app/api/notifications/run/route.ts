@@ -23,6 +23,10 @@ type Subscription = {
  * claimed by inserting into notifications_sent FIRST - the unique constraint
  * makes a duplicate claim fail - and the claim is released again if the send
  * itself errors, so the next tick retries it.
+ *
+ * The claim is per SUBSCRIPTION, not per person: someone with a phone and a
+ * laptop should be buzzed on both, and the guard exists to stop one device
+ * being buzzed twice.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -98,7 +102,9 @@ export async function POST(request: NextRequest) {
       if (pref && !pref.enabled) continue;
       if (pref?.event_types && !pref.event_types.includes(type)) continue;
 
-      // Claim it. A duplicate key here means another tick already sent it.
+      // Claim it for THIS DEVICE. A duplicate key means this device already
+      // received this reminder - not that the person did, which is why the
+      // claim carries subscription_id.
       const { data: claim, error: claimError } = await db
         .from("notifications_sent")
         .insert({
@@ -106,6 +112,7 @@ export async function POST(request: NextRequest) {
           occurrence_at: reminder.occurrence.startsAt,
           offset_minutes: reminder.offsetMinutes,
           profile_id: sub.profile_id,
+          subscription_id: sub.id,
         })
         .select("id")
         .single();

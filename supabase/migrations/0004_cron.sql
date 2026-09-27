@@ -1,16 +1,20 @@
 -- Schedule the notification runner.
 --
--- BEFORE RUNNING: replace the two placeholders below with your deployed URL and
--- the CRON_SECRET from .env.local. Vercel Cron cannot do this job - on the Hobby
--- plan it fires at most once a day, which makes a "1 hour before" reminder
--- impossible. pg_cron is free, included, and accurate to the minute.
+-- BEFORE RUNNING: replace PASTE_CRON_SECRET_HERE with the CRON_SECRET from
+-- .env.local. It is deliberately not committed here, because this repository
+-- is public. supabase/0004_cron.local.sql (gitignored) is the same file with
+-- the secret already filled in - paste that one.
+--
+-- Vercel Cron cannot do this job: on the Hobby plan it fires at most once a
+-- day, which makes a "1 hour before" reminder impossible. pg_cron is free,
+-- included with the project, and accurate to the minute.
 
 create extension if not exists pg_cron  with schema extensions;
 create extension if not exists pg_net   with schema extensions;
 
 -- Keep the secret out of cron.job, which any database admin can read.
 -- (Supabase Vault is encrypted at rest.)
-select vault.create_secret('https://YOUR-APP.vercel.app', 'app_url',     'Base URL of the deployed calendar');
+select vault.create_secret('https://bdds-cal.vercel.app', 'app_url',     'Base URL of the deployed calendar');
 select vault.create_secret('PASTE_CRON_SECRET_HERE',      'cron_secret', 'Shared secret for the notification runner');
 
 select cron.schedule(
