@@ -1,0 +1,31 @@
+# Supabase pauses free-tier projects that sit idle, which would stop reminders
+# silently. This makes a real request every six hours so the project stays awake.
+#
+# Two things to know about GitHub's scheduler:
+#   - It disables scheduled workflows after 60 days with no commits to the repo.
+#     If this stops running, push any commit to re-enable it.
+#   - Schedules are best-effort and often run 15-60 minutes late. That is fine
+#     here (six-hourly ping) but is why the reminders themselves run on pg_cron
+#     inside Supabase, not here.
+
+name: Keep database awake
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:        # lets you run it once by hand, which also activates the schedule
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the app
+        run: |
+          echo "Pinging $APP_URL/api/keepalive"
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 30 "$APP_URL/api/keepalive")
+          echo "HTTP $code"
+          cat /tmp/body
+          echo
+          test "$code" = "200"
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
