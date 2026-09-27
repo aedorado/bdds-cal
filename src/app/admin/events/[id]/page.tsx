@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getProfile, canEdit } from "@/utils/supabase/auth";
 import { EventForm } from "../event-form";
@@ -28,7 +28,25 @@ export default async function EditEventPage({ params }: PageProps<"/admin/events
     supabase.from("flight_details").select("*").eq("event_id", id).maybeSingle(),
   ]);
 
-  if (!event) notFound();
+  // A reminder outlives its event: push notifications are already on people's
+  // phones when an event is deleted or rescheduled, and tapping one must not
+  // dump them on a bare 404 with no idea what happened.
+  if (!event) {
+    return (
+      <div className="rounded-xl border border-stone-200 bg-white p-8 text-center">
+        <h1 className="text-lg font-semibold text-stone-900">This event is no longer here</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-stone-600">
+          It was deleted after the reminder was sent. If you were expecting a
+          programme, check the calendar - it may have been rescheduled rather
+          than cancelled.
+        </p>
+        <Link href="/admin"
+          className="mt-6 inline-block rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700">
+          Back to the calendar
+        </Link>
+      </div>
+    );
+  }
 
   const e = event as EventRow;
   const f = (flight ?? {}) as Partial<FlightDetails>;
