@@ -5,8 +5,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* This design is light-only. Without declaring that, Chrome and Brave on
+   Android/iOS apply their automatic dark-mode filter, which inverts
+   backgrounds but not every colour - producing near-black text on a
+   near-black header. Declaring the scheme opts out of that entirely. */
+:root {
+  color-scheme: light;
+}
+
 body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: #f5f5f4;
+  color: #1c1917;
 }
 
 /* ---------------------------------------------------------------------------
@@ -41,11 +51,33 @@ body {
 .calendar-wrap .fc .fc-button:hover { background: #f5f5f4; }
 .calendar-wrap .fc .fc-button:focus { box-shadow: 0 0 0 2px #d6d3d1; }
 .calendar-wrap .fc .fc-button-primary:disabled { background: #fff; color: #a8a29e; border-color: #e7e5e4; }
+/* The selected view must be unmistakable - a subtle tint reads as a hover
+   state, not as "you are here". */
 .calendar-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
 .calendar-wrap .fc .fc-button-primary:not(:disabled):active {
   background: #1c1917;
   border-color: #1c1917;
   color: #fff;
+  font-weight: 600;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+}
+.calendar-wrap .fc .fc-button-primary:not(:disabled).fc-button-active:hover {
+  background: #292524;
+}
+
+/* Group the view switcher so it reads as one segmented control rather than
+   four loose buttons. */
+.calendar-wrap .fc .fc-button-group {
+  border: 1px solid #d6d3d1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.calendar-wrap .fc .fc-button-group > .fc-button {
+  border: 0;
+  border-radius: 0;
+}
+.calendar-wrap .fc .fc-button-group > .fc-button + .fc-button {
+  border-left: 1px solid #e7e5e4;
 }
 
 .calendar-wrap .fc .fc-daygrid-day-number,
@@ -141,3 +173,18 @@ body {
 .calendar-wrap .fc .fc-list-event:hover td { background: #fafaf9; }
 .calendar-wrap .fc .fc-list-event-title { white-space: normal; }
 .calendar-wrap .fc .fc-list-event-dot { border-color: currentColor; }
+
+/* Month name with its movers either side.
+   FullCalendar wraps prev + title + next in an inner div, so the flex has to
+   go THERE - putting it on the chunk leaves the block-level <h2> to force a
+   line break and the arrows stack above and below the month. */
+.calendar-wrap .fc .fc-toolbar-chunk > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.calendar-wrap .fc .fc-toolbar-chunk .fc-toolbar-title {
+  margin: 0 0.25rem;
+  white-space: nowrap;
+}

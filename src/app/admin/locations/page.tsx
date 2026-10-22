@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { getProfile, canEdit } from "@/utils/supabase/auth";
+import { getProfile, isOwner } from "@/utils/supabase/auth";
 import { LocationForm } from "./location-form";
 import { deleteLocation } from "./actions";
 import type { Location } from "@/lib/types";
@@ -15,8 +15,8 @@ export default async function LocationsPage() {
     <div className="space-y-5">
       <h1 className="text-lg font-semibold text-stone-900">Places</h1>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <table className="w-full min-w-[34rem] text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
@@ -36,7 +36,7 @@ export default async function LocationsPage() {
                   {l.lat != null && l.lon != null ? `${l.lat}, ${l.lon}` : "— not set —"}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {canEdit(profile) && (
+                  {isOwner(profile) && (
                     <form action={deleteLocation}>
                       <input type="hidden" name="id" value={l.id} />
                       <button className="text-xs text-red-600 hover:text-red-800">Remove</button>
@@ -49,7 +49,14 @@ export default async function LocationsPage() {
         </table>
       </div>
 
-      {canEdit(profile) && <LocationForm />}
+      {isOwner(profile) ? (
+        <LocationForm />
+      ) : (
+        <p className="text-xs text-stone-500">
+          Places are shared by every event and by the Vaishnava calendar, so
+          only the calendar owner can add or remove them.
+        </p>
+      )}
     </div>
   );
 }

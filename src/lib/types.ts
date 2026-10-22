@@ -93,6 +93,8 @@ export type EventRow = {
   stream_platform: string | null;
   rrule: string | null;
   recurrence_until: string | null;
+  /** Explicit extra occurrence dates (yyyy-MM-dd), beyond starts_at. */
+  rdates: string[] | null;
   // Present only when read from `events` as an editor; never from public_events.
   visibility?: Visibility;
   internal_notes?: string | null;

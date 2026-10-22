@@ -45,58 +45,61 @@ export default async function NotificationsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-stone-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-stone-900">When to remind</h2>
-        <p className="mb-4 mt-1 text-xs text-stone-500">
-          Chosen per kind of event, because what suits a flight does not suit a
-          class you attend every morning. A daily class with seven reminders
-          would send over two hundred notifications a month.
-          {profile?.role !== "admin" && " Only an admin can change these."}
-        </p>
+      {profile?.role === "admin" && (
+        <div className="rounded-xl border border-stone-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-stone-900">When to remind</h2>
+          <p className="mb-4 mt-1 text-xs text-stone-500">
+            Chosen per kind of event, because what suits a flight does not suit a
+            class you attend every morning. A daily class with seven reminders
+            would send over two hundred notifications a month.
+            {profile?.role !== "admin" && " Only an admin can change these."}
+          </p>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-stone-500">
-                <th className="py-2 pr-4 font-medium">Event kind</th>
-                {LADDER.map((l) => (
-                  <th key={l.minutes} className="px-2 py-2 text-center font-medium">{l.label}</th>
-                ))}
-                <th />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {((rules ?? []) as Rule[]).map((rule) => (
-                <tr key={rule.event_type}>
-                  <td className="py-2 pr-4 text-stone-900">
-                    {EVENT_TYPE_LABEL[rule.event_type as EventType]}
-                  </td>
-                  <td colSpan={LADDER.length + 1}>
-                    <form action={saveRule} className="flex items-center gap-0">
-                      <input type="hidden" name="event_type" value={rule.event_type} />
-                      {LADDER.map((l) => (
-                        <label key={l.minutes}
-                          className="flex flex-1 justify-center px-2 py-2"
-                          title={`${EVENT_TYPE_LABEL[rule.event_type as EventType]} — ${l.label} before`}>
-                          <input type="checkbox" name="offsets" value={l.minutes}
-                            defaultChecked={rule.offsets_minutes.includes(l.minutes)}
-                            disabled={profile?.role !== "admin"}
-                            className="h-4 w-4 rounded border-stone-300" />
-                        </label>
-                      ))}
-                      {profile?.role === "admin" && (
-                        <button className="ml-2 shrink-0 text-xs text-stone-500 hover:text-stone-900">
-                          Save
-                        </button>
-                      )}
-                    </form>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-stone-500">
+                  <th className="py-2 pr-4 font-medium">Event kind</th>
+                  {LADDER.map((l) => (
+                    <th key={l.minutes} className="px-2 py-2 text-center font-medium">{l.label}</th>
+                  ))}
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {((rules ?? []) as Rule[]).map((rule) => (
+                  <tr key={rule.event_type}>
+                    <td className="py-2 pr-4 text-stone-900">
+                      {EVENT_TYPE_LABEL[rule.event_type as EventType]}
+                    </td>
+                    <td colSpan={LADDER.length + 1}>
+                      <form action={saveRule} className="flex items-center gap-0">
+                        <input type="hidden" name="event_type" value={rule.event_type} />
+                        {LADDER.map((l) => (
+                          <label key={l.minutes}
+                            className="flex flex-1 justify-center px-2 py-2"
+                            title={`${EVENT_TYPE_LABEL[rule.event_type as EventType]} — ${l.label} before`}>
+                            <input type="checkbox" name="offsets" value={l.minutes}
+                              defaultChecked={rule.offsets_minutes.includes(l.minutes)}
+                              disabled={profile?.role !== "admin"}
+                              className="h-4 w-4 rounded border-stone-300" />
+                          </label>
+                        ))}
+                        {profile?.role === "admin" && (
+                          <button className="ml-2 shrink-0 text-xs text-stone-500 hover:text-stone-900">
+                            Save
+                          </button>
+                        )}
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }

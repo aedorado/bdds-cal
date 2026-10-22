@@ -4,14 +4,21 @@ import { createClient } from "@/utils/supabase/server";
 import { getProfile, canEdit } from "@/utils/supabase/auth";
 import { EventForm } from "../event-form";
 import { toFormFields } from "@/lib/datetime";
-import { RRULE_FOR, type Repeat } from "@/lib/event-schema";
+import { type Repeat } from "@/lib/event-schema";
+import { parseRecurrence } from "@/lib/recurrence";
 import type { EventRow, FlightDetails, Location } from "@/lib/types";
 
-const repeatFromRrule = (rrule: string | null): Repeat => {
-  if (!rrule) return "none";
-  const hit = (Object.keys(RRULE_FOR) as Exclude<Repeat, "none">[])
-    .find((k) => RRULE_FOR[k] === rrule);
-  return hit ?? "weekly";
+/** Name the preset a stored rule matches, so editing does not force everyone
+ *  into the custom panel for an ordinary daily class. */
+const namePreset = (r: ReturnType<typeof parseRecurrence>): Repeat => {
+  if (!r) return "none";
+  if (r.interval === 1 && r.freq === "daily" && r.byday.length === 0) return "daily";
+  if (r.interval === 1 && r.freq === "weekly") {
+    if (r.byday.length === 0) return "weekly";
+    if (r.byday.length === 5 && ["MO", "TU", "WE", "TH", "FR"].every((d) => r.byday.includes(d as never)))
+      return "weekdays";
+  }
+  return "custom";
 };
 
 export default async function EditEventPage({ params }: PageProps<"/admin/events/[id]">) {
@@ -50,6 +57,7 @@ export default async function EditEventPage({ params }: PageProps<"/admin/events
 
   const e = event as EventRow;
   const f = (flight ?? {}) as Partial<FlightDetails>;
+  const recurrence = parseRecurrence(e.rrule, e.starts_at, e.start_tz);
   const start = toFormFields(e.starts_at, e.start_tz);
   const end = toFormFields(e.ends_at, e.end_tz);
 
@@ -72,10 +80,14 @@ export default async function EditEventPage({ params }: PageProps<"/admin/events
           cancellation_reason: e.cancellation_reason,
           stream_url: e.stream_url, stream_platform: e.stream_platform,
           internal_notes: e.internal_notes,
-          repeat: repeatFromRrule(e.rrule),
-          repeat_until: e.recurrence_until
-            ? toFormFields(e.recurrence_until, e.start_tz).date
-            : "",
+          repeat: e.rdates?.length ? "dates" : namePreset(recurrence),
+          rdates: e.rdates ?? [],
+          custom_freq: recurrence?.freq ?? "weekly",
+          custom_interval: String(recurrence?.interval ?? 1),
+          custom_byday: recurrence?.byday ?? [],
+          end_mode: recurrence?.endMode ?? "on",
+          repeat_until: recurrence?.untilDate ?? "",
+          repeat_count: recurrence?.count ? String(recurrence.count) : "",
           airline: f.airline, flight_number: f.flight_number,
           departure_airport: f.departure_airport, arrival_airport: f.arrival_airport,
           departure_terminal: f.departure_terminal, arrival_terminal: f.arrival_terminal,

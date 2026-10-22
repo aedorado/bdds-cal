@@ -32,6 +32,9 @@ export function detectIssues(
   const locName = (id: string | null) =>
     locations.find((l) => l.id === id)?.name ?? null;
 
+  // Rule-based series are still skipped - judging them means expanding a rule
+  // across the whole window, and a wrong warning is worse than a missing one.
+  // A hand-picked list of dates has no such ambiguity, so it is checked.
   const live = events
     .filter((e) => e.status !== "cancelled" && e.status !== "draft" && !e.rrule)
     .sort((a, b) => ms(a.starts_at) - ms(b.starts_at));

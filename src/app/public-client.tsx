@@ -5,7 +5,9 @@ import { CalendarView, type DisplayMode } from "@/components/calendar-view";
 import { EventModal } from "@/components/event-modal";
 import { DayPanel, type DaySelection } from "@/components/day-panel";
 import { formatRange, viewerZone, fmtDateTime } from "@/lib/datetime";
-import { FestivalFilter, useFestivalSettings, filterFestivals } from "@/components/festival-filter";
+import {
+  FestivalFilter, FestivalLocationPicker, useFestivalSettings, filterFestivals,
+} from "@/components/festival-filter";
 import { useFestivals } from "@/components/use-festivals";
 import {
   EVENT_TYPES, EVENT_TYPE_LABEL, EVENT_TYPE_COLOR,
@@ -30,7 +32,7 @@ export function PublicCalendar({
   const [selected, setSelected] = useState<EventRow | null>(null);
   const [day, setDay] = useState<DaySelection | null>(null);
   const { settings: festivalSettings, update: setFestivalSettings } = useFestivalSettings(locations);
-  const { festivals } = useFestivals(festivalSettings.locationId);
+  const { festivals } = useFestivals(festivalSettings.show ? festivalSettings.locationId : null);
   const shownFestivals = useMemo(
     () => filterFestivals(festivals, festivalSettings),
     [festivals, festivalSettings],
@@ -93,8 +95,9 @@ export function PublicCalendar({
         </select>
 
         <div className="ml-auto flex items-center gap-2">
-          <FestivalFilter locations={locations} settings={festivalSettings}
+          <FestivalLocationPicker locations={locations} settings={festivalSettings}
             onChange={setFestivalSettings} />
+          <FestivalFilter settings={festivalSettings} onChange={setFestivalSettings} />
           <button
             onClick={() => setMode(mode === "event" ? "viewer" : "event")}
             className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-50">

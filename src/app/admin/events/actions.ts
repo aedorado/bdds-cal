@@ -4,10 +4,27 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { eventFormSchema, RRULE_FOR } from "@/lib/event-schema";
+import { eventFormSchema, REPEAT_PRESET, isRuleBased } from "@/lib/event-schema";
+import { buildRecurrence, type RecurrenceInput } from "@/lib/recurrence";
 import { toUtcIso } from "@/lib/datetime";
 
-export type SaveState = { error?: string; fieldErrors?: Record<string, string> };
+export type SaveState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  /**
+   * What was submitted, handed back so the form can restore it.
+   *
+   * React resets an uncontrolled form once its action completes, so without
+   * this a rejected submission wipes everything the person typed - which is
+   * far worse than the validation error itself.
+   */
+  values?: Record<string, string>;
+};
+
+const submitted = (formData: FormData): Record<string, string> =>
+  Object.fromEntries(
+    [...formData.entries()].filter(([, v]) => typeof v === "string"),
+  ) as Record<string, string>;
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
@@ -17,6 +34,11 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
     ...raw,
     all_day: formData.get("all_day") === "on",
     id: str(formData, "id") || undefined,
+    // Object.fromEntries keeps only the last value of a repeated field, which
+    // would reduce a week of chosen days to a single one.
+    custom_byday: formData.getAll("custom_byday"),
+    rdates: formData.getAll("rdates"),
+    repeat_count: str(formData, "repeat_count") || undefined,
   });
 
   if (!parsed.success) {
@@ -25,7 +47,11 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
       const key = String(issue.path[0] ?? "form");
       fieldErrors[key] ??= issue.message;
     }
-    return { error: "Please fix the highlighted fields.", fieldErrors };
+    return {
+      error: "Please fix the highlighted fields — nothing has been lost.",
+      fieldErrors,
+      values: submitted(formData),
+    };
   }
 
   const v = parsed.data;
@@ -33,7 +59,7 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Your session expired. Please sign in again." };
+  if (!user) return { error: "Your session expired. Please sign in again.", values: submitted(formData) };
 
   // A flight is the only type whose two ends sit in different zones. For
   // everything else the end zone follows the start, so the form need not ask.
@@ -47,11 +73,45 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
       ? toUtcIso(v.end_date, "23:59", endTz, false)
       : toUtcIso(v.end_date, v.end_time, endTz, false);
   } catch {
-    return { error: "That date or time could not be understood." };
+    return { error: "That date or time could not be understood.", values: submitted(formData) };
   }
 
   if (new Date(ends_at) < new Date(starts_at)) {
-    return { error: "The event ends before it starts.", fieldErrors: { end_date: "Must be after the start" } };
+    return {
+      error: "The event ends before it starts.",
+      fieldErrors: { end_date: "Must be after the start" },
+      values: submitted(formData),
+    };
+  }
+
+  // Presets and "custom" are the same rule shape; only where the numbers come
+  // from differs.
+  let recurrence: { rrule: string; recurrenceUntil: string } | null = null;
+  let rdates: string[] | null = null;
+
+  if (v.repeat === "dates") {
+    // No rule at all - just the listed days. recurrence_until still has to be
+    // set, because the calendar query and the notification runner use it to
+    // decide whether a series is still live.
+    rdates = [...new Set(v.rdates)].sort();
+    const last = rdates[rdates.length - 1];
+    recurrence = {
+      rrule: "",
+      recurrenceUntil: toUtcIso(last, "23:59", v.start_tz, false),
+    };
+  } else if (isRuleBased(v.repeat)) {
+    const shape =
+      v.repeat === "custom"
+        ? { freq: v.custom_freq, interval: v.custom_interval, byday: v.custom_byday }
+        : REPEAT_PRESET[v.repeat];
+
+    const input: RecurrenceInput = {
+      ...shape,
+      endMode: v.end_mode,
+      untilDate: v.end_mode === "on" ? v.repeat_until : undefined,
+      count: v.end_mode === "after" ? v.repeat_count : undefined,
+    };
+    recurrence = buildRecurrence(input, starts_at, v.start_tz);
   }
 
   const row = {
@@ -71,9 +131,9 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
     stream_url: v.stream_url,
     stream_platform: v.stream_platform,
     internal_notes: v.internal_notes,
-    rrule: v.repeat === "none" ? null : RRULE_FOR[v.repeat],
-    recurrence_until:
-      v.repeat === "none" ? null : toUtcIso(v.repeat_until, "23:59", v.start_tz, false),
+    rrule: recurrence?.rrule || null,
+    recurrence_until: recurrence?.recurrenceUntil ?? null,
+    rdates,
     updated_by: user.id,
   };
 
@@ -81,14 +141,14 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
 
   if (eventId) {
     const { error } = await supabase.from("events").update(row).eq("id", eventId);
-    if (error) return { error: humanise(error.message) };
+    if (error) return { error: humanise(error.message), values: submitted(formData) };
   } else {
     const { data, error } = await supabase
       .from("events")
       .insert({ ...row, created_by: user.id })
       .select("id")
       .single();
-    if (error) return { error: humanise(error.message) };
+    if (error) return { error: humanise(error.message), values: submitted(formData) };
     eventId = data.id as string;
   }
 
@@ -104,7 +164,7 @@ export async function saveEvent(_prev: SaveState, formData: FormData): Promise<S
       seat: v.seat,
       booking_ref: v.booking_ref,
     });
-    if (error) return { error: humanise(error.message) };
+    if (error) return { error: humanise(error.message), values: submitted(formData) };
   } else {
     await supabase.from("flight_details").delete().eq("event_id", eventId);
   }

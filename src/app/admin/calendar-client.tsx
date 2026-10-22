@@ -6,7 +6,9 @@ import { EventModal } from "@/components/event-modal";
 import { DayPanel, type DaySelection } from "@/components/day-panel";
 import type { EventRow, FlightDetails, Location } from "@/lib/types";
 import { viewerZone } from "@/lib/datetime";
-import { FestivalFilter, useFestivalSettings, filterFestivals } from "@/components/festival-filter";
+import {
+  FestivalFilter, FestivalLocationPicker, useFestivalSettings, filterFestivals,
+} from "@/components/festival-filter";
 import { useFestivals } from "@/components/use-festivals";
 import { useMemo } from "react";
 
@@ -21,7 +23,7 @@ export function AdminCalendar({
   const [day, setDay] = useState<DaySelection | null>(null);
   const [mode, setMode] = useState<DisplayMode>("event");
   const { settings: festivalSettings, update: setFestivalSettings } = useFestivalSettings(locations);
-  const { festivals } = useFestivals(festivalSettings.locationId);
+  const { festivals } = useFestivals(festivalSettings.show ? festivalSettings.locationId : null);
   const shownFestivals = useMemo(
     () => filterFestivals(festivals, festivalSettings),
     [festivals, festivalSettings],
@@ -30,8 +32,9 @@ export function AdminCalendar({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2 text-xs">
-        <FestivalFilter locations={locations} settings={festivalSettings}
+        <FestivalLocationPicker locations={locations} settings={festivalSettings}
           onChange={setFestivalSettings} />
+        <FestivalFilter settings={festivalSettings} onChange={setFestivalSettings} />
         <span className="text-stone-500">Show times in</span>
         <div className="inline-flex overflow-hidden rounded-lg border border-stone-300">
           {(["event", "viewer"] as const).map((m) => (

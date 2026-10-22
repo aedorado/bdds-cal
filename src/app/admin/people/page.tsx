@@ -26,8 +26,8 @@ export default async function PeoplePage() {
     <div className="space-y-5">
       <h1 className="text-lg font-semibold text-stone-900">People</h1>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <table className="w-full min-w-[34rem] text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>

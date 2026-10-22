@@ -217,8 +217,10 @@ export function CalendarView({
         initialView={narrow ? "listMonth" : initialView}
         timeZone={mode === "event" ? "local" : viewer}
         headerToolbar={{
-          left: "prev,next today",
-          center: "title",
+          // Movers sit either side of the month name, so stepping through
+          // months does not mean crossing the toolbar to find the arrows.
+          left: "today",
+          center: "prev,title,next",
           right: narrow
             ? "dayGridMonth,listMonth"
             : "dayGridMonth,timeGridWeek,timeGridDay,listMonth",

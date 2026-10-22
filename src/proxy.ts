@@ -9,10 +9,29 @@ export default async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/admin") && !user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return withRefreshedCookies(NextResponse.redirect(loginUrl), supabaseResponse);
   }
 
   return supabaseResponse;
+}
+
+/**
+ * Carry refreshed auth cookies onto a response we built ourselves.
+ *
+ * updateSession may have rotated the token and written new cookies onto
+ * supabaseResponse. Returning a different response object discards them, and
+ * the next request arrives holding a token that has already been consumed.
+ */
+function withRefreshedCookies(target: NextResponse, source: NextResponse) {
+  source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
+
+  // Without these a redirect can be cached and replayed for someone it was
+  // never issued to.
+  for (const header of ["cache-control", "expires", "pragma"]) {
+    const value = source.headers.get(header);
+    if (value) target.headers.set(header, value);
+  }
+  return target;
 }
 
 export const config = {

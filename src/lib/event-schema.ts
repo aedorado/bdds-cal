@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { EVENT_TYPES, STATUSES, VISIBILITIES } from "./types";
+import { FREQUENCIES, WEEKDAYS, type Frequency_, type WeekdayKey } from "./recurrence";
 
-export const REPEATS = ["none", "daily", "weekdays", "weekly"] as const;
+export const REPEATS = ["none", "daily", "weekdays", "weekly", "custom", "dates"] as const;
 export type Repeat = (typeof REPEATS)[number];
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
@@ -9,16 +10,32 @@ export const REPEAT_LABEL: Record<Repeat, string> = {
   daily: "Every day",
   weekdays: "Every weekday (Mon-Fri)",
   weekly: "Every week, same day",
+  custom: "Custom…",
+  dates: "On specific dates…",
 };
 
-export const RRULE_FOR: Record<Exclude<Repeat, "none">, string> = {
-  daily: "FREQ=DAILY",
-  weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
-  weekly: "FREQ=WEEKLY",
+/** The presets are just named shapes of the same custom rule. */
+/** A pattern, as opposed to a hand-picked list of dates. */
+export const isRuleBased = (r: Repeat) =>
+  r !== "none" && r !== "dates";
+
+export const REPEAT_PRESET: Record<
+  Exclude<Repeat, "none" | "custom" | "dates">,
+  { freq: Frequency_; interval: number; byday: WeekdayKey[] }
+> = {
+  daily: { freq: "daily", interval: 1, byday: [] },
+  weekdays: { freq: "weekly", interval: 1, byday: ["MO", "TU", "WE", "TH", "FR"] },
+  weekly: { freq: "weekly", interval: 1, byday: [] },
 };
 
 const optional = (s: z.ZodString) =>
-  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), s.nullable());
+  z.preprocess(
+    (v) =>
+      v === undefined || v === null || (typeof v === "string" && v.trim() === "")
+        ? null
+        : v,
+    s.nullable(),
+  );
 
 export const eventFormSchema = z
   .object({
@@ -47,7 +64,14 @@ export const eventFormSchema = z
     internal_notes: optional(z.string().max(5000)),
 
     repeat: z.enum(REPEATS),
-    repeat_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+    custom_freq: z.enum(FREQUENCIES).default("weekly"),
+    custom_interval: z.coerce.number().int().min(1).max(365).default(1),
+    custom_byday: z.array(z.enum(WEEKDAYS.map((w) => w.key) as [WeekdayKey, ...WeekdayKey[]])).default([]),
+    end_mode: z.enum(["on", "after", "never"]).default("on"),
+    repeat_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default(""),
+    repeat_count: z.coerce.number().int().min(1).max(999).optional(),
+    /** repeat = "dates": occurrences beyond the start date, as yyyy-MM-dd. */
+    rdates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).default([]),
 
     // Flight-only. Ignored unless event_type === "flight".
     airline: optional(z.string().max(80)),
@@ -63,9 +87,21 @@ export const eventFormSchema = z
     message: "Say why it was cancelled - devotees will see this",
     path: ["cancellation_reason"],
   })
-  .refine((v) => v.repeat === "none" || !!v.repeat_until, {
-    message: "A repeating event needs an end date",
+  .refine((v) => !isRuleBased(v.repeat) || v.end_mode !== "on" || !!v.repeat_until, {
+    message: "Choose the date it should stop repeating",
     path: ["repeat_until"],
+  })
+  .refine((v) => !isRuleBased(v.repeat) || v.end_mode !== "after" || !!v.repeat_count, {
+    message: "Say how many times it should repeat",
+    path: ["repeat_count"],
+  })
+  .refine(
+    (v) => v.repeat !== "custom" || v.custom_freq !== "weekly" || v.custom_byday.length > 0,
+    { message: "Pick at least one day of the week", path: ["custom_byday"] },
+  )
+  .refine((v) => v.repeat !== "dates" || v.rdates.length > 0, {
+    message: "Add at least one more date, or choose \"Does not repeat\"",
+    path: ["rdates"],
   });
 
 export type EventFormValues = z.input<typeof eventFormSchema>;
