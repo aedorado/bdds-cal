@@ -34,7 +34,7 @@ export type FestivalRow = {
  *  - "viewer" : everything converted to the reader's own zone. What someone
  *               joining a live stream from another country needs.
  */
-function toInput(e: EventRow, mode: DisplayMode, viewer: string): EventInput {
+function toInputs(e: EventRow, mode: DisplayMode, viewer: string): EventInput[] {
   const naive = (utc: string, zone: string) =>
     DateTime.fromISO(utc, { zone: "utc" }).setZone(zone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -63,14 +63,28 @@ function toInput(e: EventRow, mode: DisplayMode, viewer: string): EventInput {
       .setZone(mode === "event" ? e.end_tz : viewer)
       .plus({ days: 1 })
       .toFormat("yyyy-MM-dd");
-    return {
+    const primaryStart = DateTime.fromISO(e.starts_at, { zone: "utc" })
+      .setZone(mode === "event" ? e.start_tz : viewer)
+      .toFormat("yyyy-MM-dd");
+    const primary: EventInput = {
       ...base,
       allDay: true,
-      start: DateTime.fromISO(e.starts_at, { zone: "utc" })
-        .setZone(mode === "event" ? e.start_tz : viewer)
-        .toFormat("yyyy-MM-dd"),
+      start: primaryStart,
       end: endDate,
     };
+    if (!e.rdates?.length) return [primary];
+    const durationDays = Math.max(
+      1,
+      Math.round(DateTime.fromISO(endDate).diff(DateTime.fromISO(primaryStart), "days").days),
+    );
+    const extras: EventInput[] = e.rdates.map((d) => ({
+      ...base,
+      id: `${e.id}-${d}`,
+      allDay: true,
+      start: d,
+      end: DateTime.fromISO(d).plus({ days: durationDays }).toFormat("yyyy-MM-dd"),
+    }));
+    return [primary, ...extras];
   }
 
   if (e.rrule) {
@@ -78,23 +92,53 @@ function toInput(e: EventRow, mode: DisplayMode, viewer: string): EventInput {
       ? DateTime.fromISO(e.recurrence_until, { zone: "utc" }).toFormat("yyyyLLdd'T'HHmmss'Z'")
       : undefined;
     const mins = DateTime.fromISO(e.ends_at).diff(DateTime.fromISO(e.starts_at), "minutes").minutes;
-    return {
-      ...base,
-      rrule: {
-        dtstart: start,
-        ...Object.fromEntries(
-          e.rrule.split(";").map((p) => {
-            const [k, v] = p.split("=");
-            return [k.toLowerCase(), k === "BYDAY" ? v.split(",") : v.toLowerCase()];
-          }),
-        ),
-        ...(until ? { until } : {}),
+    return [
+      {
+        ...base,
+        rrule: {
+          dtstart: start,
+          ...Object.fromEntries(
+            e.rrule.split(";").map((p) => {
+              const [k, v] = p.split("=");
+              return [k.toLowerCase(), k === "BYDAY" ? v.split(",") : v.toLowerCase()];
+            }),
+          ),
+          ...(until ? { until } : {}),
+        },
+        duration: { minutes: mins },
       },
-      duration: { minutes: mins },
-    };
+    ];
   }
 
-  return { ...base, start, end };
+  const primary: EventInput = { ...base, start, end };
+  if (!e.rdates?.length) return [primary];
+
+  const durationMs = new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime();
+  const startTime = DateTime.fromISO(e.starts_at, { zone: "utc" }).setZone(e.start_tz);
+
+  const extras: EventInput[] = e.rdates.map((d) => {
+    const occStart = DateTime.fromISO(d, { zone: e.start_tz }).set({
+      hour: startTime.hour,
+      minute: startTime.minute,
+      second: 0,
+      millisecond: 0,
+    });
+    const occEnd = occStart.plus({ milliseconds: durationMs });
+    const occStartUtc = occStart.toUTC().toISO()!;
+    const occEndUtc = occEnd.toUTC().toISO()!;
+
+    const oStart = mode === "event" ? naive(occStartUtc, e.start_tz) : occStartUtc;
+    const oEnd = mode === "event" ? naive(occEndUtc, e.end_tz) : occEndUtc;
+
+    return {
+      ...base,
+      id: `${e.id}-${d}`,
+      start: oStart,
+      end: oEnd,
+    };
+  });
+
+  return [primary, ...extras];
 }
 
 /**
@@ -180,7 +224,7 @@ export function CalendarView({
   }
 
   const items = useMemo<EventInput[]>(() => {
-    const evts = events.map((e) => toInput(e, mode, viewer));
+    const evts = events.flatMap((e) => toInputs(e, mode, viewer));
     // Rendered as list-items (a dot and a label) rather than background
     // events: background events all draw their title in the same corner of the
     // cell, so on a day with three observances they print on top of each other.

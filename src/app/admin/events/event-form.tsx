@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { DateTime } from "luxon";
 import Link from "next/link";
 import { saveEvent, deleteEvent, type SaveState } from "./actions";
@@ -61,10 +61,31 @@ export function EventForm({
     (defaults.custom_byday as WeekdayKey[] | undefined) ?? [],
   );
   const [endMode, setEndMode] = useState<EndMode>((defaults.end_mode as EndMode) ?? "on");
+  const [repeatUntil, setRepeatUntil] = useState<string>(String(defaults.repeat_until ?? ""));
+  const [repeatCount, setRepeatCount] = useState<string>(String(defaults.repeat_count ?? ""));
   const [rdates, setRdates] = useState<string[]>(
     (defaults.rdates as string[] | undefined) ?? [],
   );
   const [nextDate, setNextDate] = useState("");
+
+  useEffect(() => {
+    if (!state.values) return;
+    const v = state.values;
+    if (v.event_type) setType(v.event_type as EventType);
+    if ("all_day" in v) setAllDay(v.all_day === "true" || v.all_day === "on");
+    if (v.status) setStatus(v.status as string);
+    if (v.repeat) setRepeat(v.repeat as Repeat);
+    if (v.start_tz) setStartTz(v.start_tz as string);
+    if (v.custom_freq) setFreq(v.custom_freq as Frequency_);
+    if (v.custom_interval) setInterval(String(v.custom_interval));
+    if (v.end_mode) setEndMode(v.end_mode as EndMode);
+    if (v.repeat_until !== undefined) setRepeatUntil(String(v.repeat_until ?? ""));
+    if (v.repeat_count !== undefined) setRepeatCount(String(v.repeat_count ?? ""));
+    if (Array.isArray(v.custom_byday)) setByday(v.custom_byday as WeekdayKey[]);
+    else if (typeof v.custom_byday === "string" && v.custom_byday) setByday([v.custom_byday as WeekdayKey]);
+    if (Array.isArray(v.rdates)) setRdates(v.rdates as string[]);
+    else if (typeof v.rdates === "string" && v.rdates) setRdates([v.rdates as string]);
+  }, [state]);
 
   function addDate() {
     const d = nextDate.trim();
@@ -277,7 +298,7 @@ export function EventForm({
                       <>
                         On
                         <input name="repeat_until" type="date" disabled={endMode !== "on"}
-                          defaultValue={String(defaults.repeat_until ?? "")}
+                          value={repeatUntil} onChange={(e) => setRepeatUntil(e.target.value)}
                           className={`${field} w-40 disabled:bg-stone-100`} />
                       </>
                     )}
@@ -286,7 +307,7 @@ export function EventForm({
                         After
                         <input name="repeat_count" type="number" min={1} max={999}
                           disabled={endMode !== "after"}
-                          defaultValue={String(defaults.repeat_count ?? "")}
+                          value={repeatCount} onChange={(e) => setRepeatCount(e.target.value)}
                           className={`${field} w-16 text-center disabled:bg-stone-100`} />
                         times
                       </>
@@ -309,8 +330,8 @@ export function EventForm({
                     : repeat === "weekdays" ? ["MO", "TU", "WE", "TH", "FR"]
                     : [],
                   endMode,
-                  untilDate: String(defaults.repeat_until ?? "") || undefined,
-                  count: Number(defaults.repeat_count) || undefined,
+                  untilDate: repeatUntil || undefined,
+                  count: Number(repeatCount) || undefined,
                 },
                 startTz,
               )}

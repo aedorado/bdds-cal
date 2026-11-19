@@ -18,13 +18,28 @@ export type SaveState = {
    * this a rejected submission wipes everything the person typed - which is
    * far worse than the validation error itself.
    */
-  values?: Record<string, string>;
+  values?: Record<string, string | string[]>;
 };
 
-const submitted = (formData: FormData): Record<string, string> =>
-  Object.fromEntries(
-    [...formData.entries()].filter(([, v]) => typeof v === "string"),
-  ) as Record<string, string>;
+const submitted = (formData: FormData): Record<string, string | string[]> => {
+  const result: Record<string, string | string[]> = {};
+  for (const [key, value] of formData.entries()) {
+    if (typeof value !== "string") continue;
+    if (key === "custom_byday" || key === "rdates") {
+      const existing = result[key];
+      if (Array.isArray(existing)) {
+        existing.push(value);
+      } else if (typeof existing === "string") {
+        result[key] = [existing, value];
+      } else {
+        result[key] = [value];
+      }
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+};
 
 const str = (fd: FormData, k: string) => (fd.get(k) as string | null) ?? "";
 
